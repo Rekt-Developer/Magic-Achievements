@@ -2,7 +2,6 @@ name: GitHub Achievements Tracker
 
 # Comprehensive event triggers
 on:
-  # Standard repository events
   push:
     branches: 
       - main
@@ -17,8 +16,6 @@ on:
       - opened
       - closed
       - labeled
-
-  # Additional workflow control
   workflow_dispatch:
     inputs:
       debug_mode:
@@ -37,7 +34,11 @@ permissions:
 # Define reusable environment variables
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  ACHIEVEMENTS_CONFIG: '.github/achievements-config.json'
+
+# Concurrency management
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # Main workflow job for tracking achievements
 jobs:
@@ -174,14 +175,12 @@ jobs:
           echo "🏆 GitHub Achievements Tracked Successfully"
           echo "📊 See workflow logs for detailed achievements"
 
-# Workflow Visualization Configuration
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-# Error Handling
-on:
-  workflow_run:
-    workflows: ["GitHub Achievements Tracker"]
-    types:
-      - completed
+  # Error Handling Job
+  error-handler:
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Error Notification
+        run: |
+          echo "❌ Workflow encountered an error"
+          exit 1
