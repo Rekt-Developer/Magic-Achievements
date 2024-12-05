@@ -1,141 +1,187 @@
-name: Magic Achievements
+name: GitHub Achievements Tracker
 
+# Comprehensive event triggers
 on:
-  issues:
-    types: [opened, reopened]
+  # Standard repository events
+  push:
+    branches: 
+      - main
+      - develop
   pull_request:
-    types: [opened, synchronize, reopened]
-  discussion:
-    types: [answered]
-  star:
-    types: [created]
-  workflow_dispatch:  # Allow manual triggering
+    types: 
+      - opened
+      - closed
+      - synchronize
+  issues:
+    types: 
+      - opened
+      - closed
+      - labeled
 
+  # Additional workflow control
+  workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: 'Enable debug logging'
+        required: false
+        default: 'false'
+        type: boolean
+
+# Granular permissions for enhanced security
 permissions:
-  contents: read  # Reduced to read-only for security
+  contents: read
   issues: write
-  pull_request_reviews: write
+  pull-requests: write
   discussions: write
 
+# Define reusable environment variables
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  ACHIEVEMENTS_CONFIG: '.github/achievements-config.json'
+
+# Main workflow job for tracking achievements
 jobs:
-  achievements:
+  github-achievements:
     runs-on: ubuntu-latest
     
+    # Conditional job execution
+    if: >
+      github.event_name != 'pull_request' || 
+      github.event.action != 'synchronize'
+
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch full history for comprehensive context
+      # Comprehensive repository checkout
+      - name: Advanced Repository Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history
+          persist-credentials: false
 
-    # Pair Extraordinaire: Safely add co-authors to PRs
-    - name: Add Co-Authors to Pull Requests
-      if: github.event_name == 'pull_request' && github.event.action == 'opened'
-      uses: actions/github-script@v7
-      env:
-        POTENTIAL_COAUTHORS: |
-          John Doe <johndoe@example.com>
-          Jane Smith <janesmith@example.com>
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          const coauthors = process.env.POTENTIAL_COAUTHORS.trim().split('\n');
-          const randomCoauthor = coauthors[Math.floor(Math.random() * coauthors.length)];
-          
-          const prBody = context.payload.pull_request.body || "";
-          const coauthorMessage = `\n\nCo-authored-by: ${randomCoauthor}`;
-          
-          await github.rest.pulls.update({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: context.payload.pull_request.number,
-            body: `${prBody}${coauthorMessage}`,
-          });
+      # Achievement: Quickdraw (Fast Issue/PR Response)
+      - name: 🚀 Quickdraw Achievement Tracker
+        if: github.event_name == 'issues' || github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const rapidResponseTime = 5 * 60 * 1000; // 5 minutes
+            const eventType = context.eventName;
+            const eventPayload = context.payload;
+            
+            const rapidResponseAchievement = {
+              issueNumber: eventType === 'issues' ? eventPayload.issue.number : eventPayload.pull_request.number,
+              createdAt: new Date(eventType === 'issues' ? eventPayload.issue.created_at : eventPayload.pull_request.created_at),
+              respondedAt: new Date(),
+              type: eventType
+            };
 
-    # Smart Issue Management
-    - name: Intelligent Issue Handling
-      if: github.event_name == 'issues' && github.event.action == 'opened'
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          const issueTitle = context.payload.issue.title.toLowerCase();
-          const labels = [];
+            // Calculate response time
+            const responseTime = rapidResponseAchievement.respondedAt - rapidResponseAchievement.createdAt;
+            
+            if (responseTime <= rapidResponseTime) {
+              console.log(`🏆 Quickdraw Achievement Earned for ${eventType} #${rapidResponseAchievement.issueNumber}`);
+              
+              // Optional: Add a comment or label
+              if (eventType === 'issues') {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: rapidResponseAchievement.issueNumber,
+                  body: "🏆 Quickdraw Achievement: Rapid Response Activated!"
+                });
+              }
+            }
 
-          // Automatic labeling
-          if (issueTitle.includes('bug')) labels.push('type: bug');
-          if (issueTitle.includes('feature')) labels.push('type: enhancement');
-          if (issueTitle.includes('documentation')) labels.push('type: docs');
-
-          if (labels.length > 0) {
-            await github.rest.issues.addLabels({
+      # Achievement: Pull Shark (Multiple Pull Request Contributions)
+      - name: 🦈 Pull Shark Achievement Tracker
+        if: github.event_name == 'pull_request' && github.event.action == 'closed'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullRequester = context.payload.pull_request.user.login;
+            
+            // Fetch user's pull requests
+            const pullsResponse = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.issue.number,
-              labels: labels
+              state: 'closed',
+              creator: pullRequester
             });
-          }
 
-    # Pull Request Quality Gate
-    - name: Pull Request Quality Check
-      if: github.event_name == 'pull_request' && github.event.action == 'opened'
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          const pr = context.payload.pull_request;
-          const changedFiles = await github.rest.pulls.listFiles({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: pr.number
-          });
+            // Pull Shark Achievement Levels
+            const achievementLevels = {
+              bronzeSharks: 5,
+              silverSharks: 16,
+              goldSharks: 32
+            };
 
-          // Check file count and size
-          if (changedFiles.data.length > 10) {
-            await github.rest.pulls.createReview({
+            const totalPulls = pullsResponse.data.length;
+
+            if (totalPulls >= achievementLevels.goldSharks) {
+              console.log(`🏆 Pull Shark Gold Achievement: ${pullRequester} - ${totalPulls} PRs`);
+            } else if (totalPulls >= achievementLevels.silverSharks) {
+              console.log(`🏆 Pull Shark Silver Achievement: ${pullRequester} - ${totalPulls} PRs`);
+            } else if (totalPulls >= achievementLevels.bronzeSharks) {
+              console.log(`🏆 Pull Shark Bronze Achievement: ${pullRequester} - ${totalPulls} PRs`);
+            }
+
+      # Achievement: Galaxy Brain (Discussions and Knowledge Sharing)
+      - name: 🌌 Galaxy Brain Achievement Tracker
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const discussionContributors = new Set();
+            
+            // Fetch recent discussions
+            const discussionsResponse = await github.rest.discussions.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: pr.number,
-              event: 'REQUEST_CHANGES',
-              body: 'Too many files changed. Please break this PR into smaller, focused changes.'
+              state: 'open'
             });
-          }
 
-    # Discussion Engagement Tracking
-    - name: Track Discussion Engagement
-      if: github.event_name == 'discussion' && github.event.action == 'answered'
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          const discussionTitle = context.payload.discussion.title;
-          const answererLogin = context.payload.answer.author.login;
+            discussionsResponse.data.forEach(discussion => {
+              discussionContributors.add(discussion.user.login);
+            });
 
-          console.log(`Discussion "${discussionTitle}" answered by ${answererLogin}`);
-          
-          // Optional: You could log this to an external service or create a comment
+            console.log(`🌟 Galaxy Brain Contributors: ${[...discussionContributors]}`);
 
-    # Star Appreciation
-    - name: Star Appreciation
-      if: github.event_name == 'star'
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          const stargazer = context.payload.sender.login;
-          
-          // Create a thank you issue
-          await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `Thank You, ${stargazer}!`,
-            body: `A big thank you to @${stargazer} for starring our repository! 🌟`
-          });
+      # Artifact Tracking
+      - name: 📦 Artifact Analysis
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
 
-    # Error Handling and Logging
-    - name: Workflow Error Handling
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          core.setFailed('Workflow encountered an error. Please check the logs.')
+            console.log(`🏺 Total Artifacts: ${artifacts.data.total_count}`);
+
+      # Debug and Logging
+      - name: 🔍 Workflow Insights
+        if: inputs.debug_mode == 'true'
+        run: |
+          echo "Workflow triggered by: ${{ github.event_name }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+
+      # Final Achievement Summary
+      - name: 🌟 Achievement Summary
+        run: |
+          echo "🏆 GitHub Achievements Tracked Successfully"
+          echo "📊 See workflow logs for detailed achievements"
+
+# Workflow Visualization Configuration
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Error Handling
+on:
+  workflow_run:
+    workflows: ["GitHub Achievements Tracker"]
+    types:
+      - completed
